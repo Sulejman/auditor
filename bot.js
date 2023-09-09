@@ -1,4 +1,4 @@
-const { Octokit } = require("@octokit/core");
+const {Octokit} = require("@octokit/core");
 const axios = require("axios");
 require('dotenv').config();
 
@@ -11,7 +11,7 @@ const octokit = new Octokit({
     auth: GITHUB_TOKEN
 });
 
-async function getChatGPTReview(code) {
+async function getChatGPTReview(code, previousReviews) {
     const headers = {
         Authorization: `Bearer ${OPENAI_TOKEN}`,
         'Content-Type': 'application/json',
@@ -20,13 +20,16 @@ async function getChatGPTReview(code) {
     const data = {
         model: "gpt-3.5-turbo",
         messages: [
-            { role: "user", content: `Review the following code and suggest improvements: \n\`\`\`${code}\n\`\`\`` }
+            {
+                role: "user",
+                content: `Review the following code segment and suggest improvements, warn about issues or vulnerabilities: \n\`\`\`${code}\n\`\`\`
+            Also take into account the following context, you reviewed the previous code segments in this way: ${previousReviews.join("\n")}\n\n
+            `}
         ],
         temperature: 0.7
     };
 
-    const response = await axios.post('https://api.openai.com/v1/chat/completions', data, { headers });
-
+    const response = await axios.post('https://api.openai.com/v1/chat/completions', data, {headers});
     return response.data.choices[0].message.content;
 }
 
@@ -42,39 +45,27 @@ async function getDiffContent(pullNumber) {
             }
         });
 
-        // If you're not automatically redirected, then use the new URL manually
-        if (response.status === 200) {
-            console.log("DATA FETCHING:", response.data)
-            return response.data;
-        } else if (response.headers.location) {
-            const newUrl = response.headers.location;
-            const rawResponse = await axios.get(newUrl);
-            console.log("DATA FETCHING DIFF:", rawResponse.data)
-            return rawResponse.data;
-        }
+            //console.log("DATA FETCHING:", response.data)
+            const segmentedData = processDiff(response.data);
+            return segmentedData;
     } catch (error) {
         console.error('Error fetching diff:', error);
     }
 }
 
 async function reviewPullRequest(owner, repo, pullNumber) {
-    //const diffUrl = await getPRDiff(owner, repo, pullNumber);
-    console.log("PULL NUMBER:", pullNumber)
-    const diffContent = await getDiffContent(pullNumber);
-    console.log("DIFF CONTENT:", diffContent)
-    // Review this content using OpenAI
-    const review = await getChatGPTReview(diffContent);
-    console.log("REVIEW:", review)
+    try {
+        const diffContent = await getDiffContent(pullNumber);
+        const reviews = [];
 
-    // if(review.data.error) {
-    //     console.log(
-    //         `Error: ${review.data.error.message} (HTTP status: ${review.data.error.status})`
-    //     )
-    // } else {
-    //     console.log(`Review: ${review}`);
-    // }
-
-    await postReviewComment(owner, repo, pullNumber, review);
+        for (const segment of diffContent) {
+            const review = await getChatGPTReview(segment, reviews);
+            reviews.push(review);
+            await postReviewComment(owner, repo, pullNumber, review);
+        }
+    } catch (error) {
+        console.error('Error during review PR:', error);
+    }
 }
 
 // Check if the script is called directly from the command line
@@ -96,22 +87,39 @@ if (require.main === module) {
 }
 
 async function postReviewComment(owner, repo, pullNumber, review) {
-    // try {
-        console.log("Posting review...");
-        console.log("OWNER:", owner)
-        console.log("REPO:", repo)
-        console.log("PULL NUMBER:", pullNumber)
-        console.log("REVIEW:", review)
+    await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
+        owner: owner,
+        repo: repo,
+        issue_number: pullNumber, // PRs are treated as issues in GitHub API for comments
+        body: review
+    })
+    console.log("Review posted successfully!");
+}
 
-        const response = await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
-            owner: owner,
-            repo: repo,
-            issue_number: pullNumber, // PRs are treated as issues in GitHub API for comments
-            body: review
-        })
-        console.log("RESPONSE:", response)
-        console.log("Review posted successfully!");
-    // } catch (error) {
-    //     console.error('Error posting review:', error);
-    // }
+
+function segmentByFile(diff) {
+    const fileSegments = diff.split('diff --git');
+    return fileSegments.slice(1); // Omit the first empty segment
+}
+
+function compressSegment(segment) {
+    const lines = segment.split('\n');
+
+    // Remove metadata lines
+    const compressed = lines.filter(line => {
+        return !line.startsWith('index ') &&
+            !line.startsWith('new file mode') &&
+            !line.startsWith('--- ') &&
+            !line.startsWith('+++ ');
+    });
+
+    // You can add more compression logic here, such as removing large delete sections
+    // or decreasing context lines.
+
+    return compressed.join('\n');
+}
+
+function processDiff(diff) {
+    const segments = segmentByFile(diff);
+    return segments.map(segment => compressSegment(segment));
 }
