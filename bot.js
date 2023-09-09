@@ -20,7 +20,7 @@ async function getChatGPTReview(code) {
     const data = {
         model: "gpt-3.5-turbo",
         messages: [
-            { role: "user", content: `Review the following code: \n\`\`\`${code}\n\`\`\`` }
+            { role: "user", content: `Review the following code and suggest improvements: \n\`\`\`${code}\n\`\`\`` }
         ],
         temperature: 0.7
     };
@@ -59,21 +59,23 @@ async function getDiffContent(pullNumber) {
 
 async function reviewPullRequest(owner, repo, pullNumber) {
     //const diffUrl = await getPRDiff(owner, repo, pullNumber);
+    console.log("PULL NUMBER:", pullNumber)
     const diffContent = await getDiffContent(pullNumber);
-
+    console.log("DIFF CONTENT:", diffContent)
     // Review this content using OpenAI
     const review = await getChatGPTReview(diffContent);
+    console.log("REVIEW:", review)
 
-    if(review.data.error) {
-        console.log(
-            `Error: ${review.data.error.message} (HTTP status: ${review.data.error.status})`
-        )
-    } else {
-        console.log(`Review: ${review}`);
-    }
+    // if(review.data.error) {
+    //     console.log(
+    //         `Error: ${review.data.error.message} (HTTP status: ${review.data.error.status})`
+    //     )
+    // } else {
+    //     console.log(`Review: ${review}`);
+    // }
+
     await postReviewComment(owner, repo, pullNumber, review);
 }
-
 
 // Check if the script is called directly from the command line
 if (require.main === module) {
@@ -84,7 +86,7 @@ if (require.main === module) {
             console.log('Review done!');
             process.exit(0); // Exit the process
         }).catch((error) => {
-            console.error('Error during review:', JSON.stringify(error.response));
+            console.error('Error during review:', JSON.stringify(error));
             process.exit(1); // Exit with error code
         });
     } else {
@@ -94,15 +96,22 @@ if (require.main === module) {
 }
 
 async function postReviewComment(owner, repo, pullNumber, review) {
-    try {
-        await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
+    // try {
+        console.log("Posting review...");
+        console.log("OWNER:", owner)
+        console.log("REPO:", repo)
+        console.log("PULL NUMBER:", pullNumber)
+        console.log("REVIEW:", review)
+
+        const response = await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
             owner: owner,
             repo: repo,
             issue_number: pullNumber, // PRs are treated as issues in GitHub API for comments
             body: review
-        });
+        })
+        console.log("RESPONSE:", response)
         console.log("Review posted successfully!");
-    } catch (error) {
-        console.error('Error posting review:', error);
-    }
+    // } catch (error) {
+    //     console.error('Error posting review:', error);
+    // }
 }
