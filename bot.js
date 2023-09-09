@@ -1,10 +1,9 @@
 const { Octokit } = require("@octokit/core");
 const axios = require("axios");
-const res = require("express/lib/response");
 
 const GITHUB_TOKEN = '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';
 const OPENAI_TOKEN = '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';
-const REPO = 'auditor'; 
+const REPO = 'cosmohub-site';
 const OWNER = 'sulejman'
 
 const octokit = new Octokit({
@@ -18,7 +17,7 @@ async function getChatGPTReview(code) {
     };
 
     const data = {
-        model: "gpt-3.5-turbo",
+        model: "gpt-3.5-turbo-16k",
         messages: [
             { role: "user", content: `Review the following code: \n\`\`\`${code}\n\`\`\`` }
         ],
@@ -30,23 +29,7 @@ async function getChatGPTReview(code) {
     return response.data.choices[0].message.content;
 }
 
-async function getPRDiff(owner, repo, pullNumber) {
-    const prData = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
-        owner: owner,
-        repo: repo,
-        pull_number: pullNumber,
-        headers: {
-            'X-GitHub-Api-Version': '2022-11-28'
-        }
-    });
-    console.log(prData)
-    return prData.data.diff_url;
-}
-
 async function getDiffContent(pullNumber) {
-    // const response = await axios.get(diffUrl);
-    // return response.data;
-
     try {
         const response = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
             owner: OWNER,
@@ -78,9 +61,16 @@ async function reviewPullRequest(owner, repo, pullNumber) {
     const diffContent = await getDiffContent(pullNumber);
 
     // Review this content using OpenAI
-    //const review = await getChatGPTReview(diffContent);
+    const review = await getChatGPTReview(diffContent);
 
-    ///console.log(review);
+    if(review.data.error) {
+        console.log(
+            `Error: ${review.data.error.message} (HTTP status: ${review.data.error.status})`
+        )
+    } else {
+        console.log(`Review: ${review}`);
+    }
+    await postReviewComment(owner, repo, pullNumber, review);
 }
 
 
@@ -93,11 +83,25 @@ if (require.main === module) {
             console.log('Review done!');
             process.exit(0); // Exit the process
         }).catch((error) => {
-            console.error('Error during review:', error);
+            console.error('Error during review:', error.response.data.error.message);
             process.exit(1); // Exit with error code
         });
     } else {
         console.error('Please provide a PR number.');
         process.exit(1);
+    }
+}
+
+async function postReviewComment(owner, repo, pullNumber, review) {
+    try {
+        await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
+            owner: owner,
+            repo: repo,
+            issue_number: pullNumber, // PRs are treated as issues in GitHub API for comments
+            body: review
+        });
+        console.log("Review posted successfully!");
+    } catch (error) {
+        console.error('Error posting review:', error);
     }
 }
