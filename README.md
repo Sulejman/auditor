@@ -1,4 +1,4 @@
 # auditor
-Install dependencies, delete package-lock.json.
-Seta all environment variables.
+Install dependencies `npm i`.
+Set all environment variables.
 Run: `node bot.js <PRNumber>`
