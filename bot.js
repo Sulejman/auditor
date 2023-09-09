@@ -1,10 +1,11 @@
 const { Octokit } = require("@octokit/core");
 const axios = require("axios");
+require('dotenv').config();
 
-const GITHUB_TOKEN = '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';
-const OPENAI_TOKEN = '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';
-const REPO = 'cosmohub-site';
-const OWNER = 'sulejman'
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const OPENAI_TOKEN = process.env.OPENAI_TOKEN
+const REPO = process.env.REPO;
+const OWNER = process.env.OWNER;
 
 const octokit = new Octokit({
     auth: GITHUB_TOKEN
@@ -17,7 +18,7 @@ async function getChatGPTReview(code) {
     };
 
     const data = {
-        model: "gpt-3.5-turbo-16k",
+        model: "gpt-3.5-turbo",
         messages: [
             { role: "user", content: `Review the following code: \n\`\`\`${code}\n\`\`\`` }
         ],
@@ -83,7 +84,7 @@ if (require.main === module) {
             console.log('Review done!');
             process.exit(0); // Exit the process
         }).catch((error) => {
-            console.error('Error during review:', error.response.data.error.message);
+            console.error('Error during review:', JSON.stringify(error.response));
             process.exit(1); // Exit with error code
         });
     } else {
