@@ -11,7 +11,28 @@ const octokit = new Octokit({
     auth: GITHUB_TOKEN
 });
 
-async function getChatGPTReview(code, previousReviews) {
+async function getPRDescription(prNumber) {
+    try {
+        const baseURL = 'https://api.github.com';
+        const url = `${baseURL}/repos/${OWNER}/${REPO}/pulls/${prNumber}`;
+
+        const response = await axios.get(url, {
+            headers: {
+                "Authorization": `Bearer ${GITHUB_TOKEN}`,
+                "Accept": "application/vnd.github+json",
+                'X-GitHub-Api-Version': '2022-11-28'
+            }
+        })
+        console.log("PR DESCRIPTION:", response.data.body)
+        return response.data.body || '';  // Return the PR description
+    } catch (error) {
+        console.error('Error fetching PR description:', error);
+        return '';
+    }
+}
+
+
+async function getChatGPTReview(code, previousReviews, description) {
     const headers = {
         Authorization: `Bearer ${OPENAI_TOKEN}`,
         'Content-Type': 'application/json',
@@ -23,8 +44,10 @@ async function getChatGPTReview(code, previousReviews) {
             {
                 role: "user",
                 content: `Review the following code segment and suggest improvements, warn about issues or vulnerabilities: \n\`\`\`${code}\n\`\`\`
-            Also take into account the following context, you reviewed the previous code segments in this way: ${previousReviews.join("\n")}\n\n
-            `}
+            Also take into account the following context, which is the PR description: \n\`\`\`${description}\n\`\`\`
+            At the beginning include properly formatted code segment which is up for review. Then, in the next paragraph, write your review. Keep reviews short and concise.
+            `
+            }
         ],
         temperature: 0.7
     };
@@ -45,9 +68,9 @@ async function getDiffContent(pullNumber) {
             }
         });
 
-            //console.log("DATA FETCHING:", response.data)
-            const segmentedData = processDiff(response.data);
-            return segmentedData;
+        //console.log("DATA FETCHING:", response.data)
+        const segmentedData = processDiff(response.data);
+        return segmentedData;
     } catch (error) {
         console.error('Error fetching diff:', error);
     }
@@ -56,10 +79,11 @@ async function getDiffContent(pullNumber) {
 async function reviewPullRequest(owner, repo, pullNumber) {
     try {
         const diffContent = await getDiffContent(pullNumber);
+        const description = await getPRDescription(pullNumber)
         const reviews = [];
 
         for (const segment of diffContent) {
-            const review = await getChatGPTReview(segment, reviews);
+            const review = await getChatGPTReview(segment, reviews, description);
             reviews.push(review);
             await postReviewComment(owner, repo, pullNumber, review);
         }
