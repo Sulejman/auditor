@@ -38,6 +38,8 @@ async function getChatGPTReview(code, previousReviews, description) {
         'Content-Type': 'application/json',
     };
 
+    console.log("CODE:", code)
+
     const data = {
         model: "gpt-3.5-turbo",
         messages: [
@@ -45,7 +47,7 @@ async function getChatGPTReview(code, previousReviews, description) {
                 role: "user",
                 content: `Review the following code segment and suggest improvements, warn about issues or vulnerabilities: \n\`\`\`${code}\n\`\`\`
             Also take into account the following context, which is the PR description: \n\`\`\`${description}\n\`\`\`
-            At the beginning include properly formatted code segment which is up for review. Then, in the next paragraph, write your review. Keep reviews short and concise.
+            At the first paragraph of the review, include quoted code which are you are reviewing. Then, in the next paragraph, write your review. Keep reviews short and concise.
             `
             }
         ],
@@ -53,6 +55,7 @@ async function getChatGPTReview(code, previousReviews, description) {
     };
 
     const response = await axios.post('https://api.openai.com/v1/chat/completions', data, {headers});
+    console.log("RESPONSE:", response.data.choices[0].message.content)
     return response.data.choices[0].message.content;
 }
 
