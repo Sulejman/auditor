@@ -40,15 +40,26 @@ async function getChatGPTReview(code, previousReviews, description) {
 
     console.log("CODE:", code)
 
+    const mainPrompt = `Act as if you are senior developer or team lead. Review the following code segment and suggest improvements, warn about issues or vulnerabilities: \n\`\`\`${code}\n\`\`\`
+            Also take into account the following context, which is the PR description: \n\`\`\`${description}\n\`\`\`
+            Write review which contains recommendations on how to do these changes better, while quoting code segments for relevant review points? Keep reviews short and concise. \n\`\`\``
+
+    const contextPrompt = `Be mindful that this is continuation of review you are already doing and here is the previous review of last code segment for better context: \n\`\`\`${previousReviews[previousReviews.length]}\n\`\`\``
+
+    let prompt
+
+    if(previousReviews.length > 0) {
+        prompt = mainPrompt + contextPrompt
+    } else {
+        prompt = mainPrompt
+    }
+
     const data = {
-        model: "gpt-3.5-turbo",
+        model: "gpt-4",
         messages: [
             {
                 role: "user",
-                content: `Review the following code segment and suggest improvements, warn about issues or vulnerabilities: \n\`\`\`${code}\n\`\`\`
-            Also take into account the following context, which is the PR description: \n\`\`\`${description}\n\`\`\`
-            At the first paragraph of the review, include quoted code which are you are reviewing. Then, in the next paragraph, write your review. Keep reviews short and concise.
-            `
+                content: prompt
             }
         ],
         temperature: 0.7
@@ -71,9 +82,8 @@ async function getDiffContent(pullNumber) {
             }
         });
 
-        //console.log("DATA FETCHING:", response.data)
-        const segmentedData = processDiff(response.data);
-        return segmentedData;
+        console.log("DATA FETCHING DIFF FILE:", response.data)
+        return  processDiff(response.data);
     } catch (error) {
         console.error('Error fetching diff:', error);
     }
