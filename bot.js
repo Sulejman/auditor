@@ -44,7 +44,7 @@ async function getChatGPTReview(code, previousReviews, description) {
             Also take into account the following context, which is the PR description: \n\`\`\`${description}\n\`\`\`
             Write review which contains recommendations on how to do these changes better, while quoting code segments for relevant review points? Keep reviews short and concise. \n\`\`\``
 
-    const contextPrompt = `Be mindful that this is continuation of review you are already doing and here is the previous review of last code segment for better context: \n\`\`\`${previousReviews[previousReviews.length]}\n\`\`\``
+    const contextPrompt = `Be mindful that this is continuation of review you are already doing and here is the previous review of last code segment for better context: \n\`\`\`${previousReviews[previousReviews.length - 1]}\n\`\`\``
 
     let prompt
 
