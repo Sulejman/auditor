@@ -23,10 +23,10 @@ async function getPRDescription(prNumber) {
                 'X-GitHub-Api-Version': '2022-11-28'
             }
         })
-        console.log("PR DESCRIPTION:", response.data.body)
+        //console.log("PR DESCRIPTION:", response.data.body)
         return response.data.body || '';  // Return the PR description
     } catch (error) {
-        console.error('Error fetching PR description:', error);
+        //console.error('Error fetching PR description:', error);
         return '';
     }
 }
@@ -38,7 +38,7 @@ async function getChatGPTReview(code, previousReviews, description) {
         'Content-Type': 'application/json',
     };
 
-    console.log("CODE:", code)
+    console.log(`%cCODE: ${code}`, 'color: grey');
 
     const mainPrompt = `Act as if you are senior developer or team lead. Review the following code segment and suggest improvements, warn about issues or vulnerabilities: \n\`\`\`${code}\n\`\`\`
             Also take into account the following context, which is the PR description: \n\`\`\`${description}\n\`\`\`
@@ -48,7 +48,7 @@ async function getChatGPTReview(code, previousReviews, description) {
 
     let prompt
 
-    if(previousReviews.length > 0) {
+    if (previousReviews.length > 0) {
         prompt = mainPrompt + contextPrompt
     } else {
         prompt = mainPrompt
@@ -66,7 +66,7 @@ async function getChatGPTReview(code, previousReviews, description) {
     };
 
     const response = await axios.post('https://api.openai.com/v1/chat/completions', data, {headers});
-    console.log("RESPONSE:", response.data.choices[0].message.content)
+    console.log(`%cREVIEW: ${response.data.choices[0].message.content}`, 'color: green');
     return response.data.choices[0].message.content;
 }
 
@@ -82,26 +82,22 @@ async function getDiffContent(pullNumber) {
             }
         });
 
-        console.log("DATA FETCHING DIFF FILE:", response.data)
-        return  processDiff(response.data);
+        //console.log("DATA FETCHING DIFF FILE:", response.data)
+        return processDiff(response.data);
     } catch (error) {
-        console.error('Error fetching diff:', error);
+        //console.error('Error fetching diff:', error);
     }
 }
 
 async function reviewPullRequest(owner, repo, pullNumber) {
-    try {
-        const diffContent = await getDiffContent(pullNumber);
-        const description = await getPRDescription(pullNumber)
-        const reviews = [];
+    const diffContent = await getDiffContent(pullNumber);
+    const description = await getPRDescription(pullNumber)
+    const reviews = [];
 
-        for (const segment of diffContent) {
-            const review = await getChatGPTReview(segment, reviews, description);
-            reviews.push(review);
-            await postReviewComment(owner, repo, pullNumber, review);
-        }
-    } catch (error) {
-        console.error('Error during review PR:', error);
+    for (const segment of diffContent) {
+        const review = await getChatGPTReview(segment, reviews, description);
+        reviews.push(review);
+        // await postReviewComment(owner, repo, pullNumber, review);
     }
 }
 
@@ -113,10 +109,11 @@ if (require.main === module) {
         reviewPullRequest(OWNER, REPO, prNumber).then(() => {
             console.log('Review done!');
             process.exit(0); // Exit the process
-        }).catch((error) => {
-            console.error('Error during review:', JSON.stringify(error));
-            process.exit(1); // Exit with error code
-        });
+        })
+        //     .catch((error) => {
+        //     console.error('Error during review:', JSON.stringify(error));
+        //     process.exit(1); // Exit with error code
+        // });
     } else {
         console.error('Please provide a PR number.');
         process.exit(1);
@@ -130,7 +127,7 @@ async function postReviewComment(owner, repo, pullNumber, review) {
         issue_number: pullNumber, // PRs are treated as issues in GitHub API for comments
         body: review
     })
-    console.log("Review posted successfully!");
+    //console.log("Review posted successfully!");
 }
 
 
