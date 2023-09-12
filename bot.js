@@ -39,7 +39,7 @@ async function getChatGPTReview(code, previousReviews, description) {
     };
 
     console.log(`%cCODE: ${code}`, 'color: grey');
-
+    console.log(`---------------------------------------------------------------------------------------------`)
     const mainPrompt = `Act as if you are senior developer or team lead. Review the following code segment and suggest improvements, warn about issues or vulnerabilities: \n\`\`\`${code}\n\`\`\`
             Also take into account the following context, which is the PR description: \n\`\`\`${description}\n\`\`\`
             Write review which contains recommendations on how to do these changes better, while quoting code segments for relevant review points? Keep reviews short and concise. \n\`\`\``
@@ -67,6 +67,8 @@ async function getChatGPTReview(code, previousReviews, description) {
 
     const response = await axios.post('https://api.openai.com/v1/chat/completions', data, {headers});
     console.log(`%cREVIEW: ${response.data.choices[0].message.content}`, 'color: green');
+    console.log(`---------------------------------------------------------------------------------------------`)
+
     return response.data.choices[0].message.content;
 }
 
