@@ -97,8 +97,12 @@ async function reviewPullRequest(owner, repo, pullNumber) {
     const reviews = [];
 
     for (const segment of diffContent) {
-        const review = await getChatGPTReview(segment, reviews, description);
-        reviews.push(review);
+        try {
+            const review = await getChatGPTReview(segment, reviews, description);
+            reviews.push(review);
+        } catch (error) {
+            console.log('Error generating review')
+        }
         // await postReviewComment(owner, repo, pullNumber, review);
     }
 }
